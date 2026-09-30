@@ -59,6 +59,9 @@ begin
     raise exception 'customer_not_found' using errcode = 'P0002';
   end if;
 
+  -- blocca le registrazioni di entrambi: un riscatto concorrente non può cambiare l'esito del confronto
+  perform 1 from public.registrations where customer_id in (p_keep_id, p_drop_id) for update;
+
   -- stessa serata su entrambi: si tiene quella già bruciata (a parità, quella del cliente tenuto)
   for r in
     select k.id as keep_reg, d.id as drop_reg, k.redeemed_at as keep_redeemed, d.redeemed_at as drop_redeemed

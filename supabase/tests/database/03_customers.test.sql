@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(20);
+select plan(31);
 
 insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a1', 'admin@test.local');
 insert into public.admins (user_id) values ('00000000-0000-0000-0000-0000000000a1');
@@ -76,6 +76,56 @@ select throws_ok($$ select public.merge_customers('00000000-0000-0000-0000-00000
 
 -- 20: permessi
 select ok(not has_function_privilege('authenticated', 'public.purge_inactive_customers()', 'execute'), 'authenticated non lancia la pulizia');
+
+-- 21-23: entrambi con telefono diverso, il telefono dell'unito resta come alias verso il cliente tenuto
+insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coupon_title, status) values
+  ('00000000-0000-0000-0000-00000000e103', 'merge-tre', 'Tre', 'Locale', now() - interval '1 hour', now() + interval '4 hours', 'Drink', 'live');
+insert into public.customers (id, first_name, last_name, phone_e164) values
+  ('00000000-0000-0000-0000-0000000000b1', 'Anna', 'Verdi', '+393330000011'),
+  ('00000000-0000-0000-0000-0000000000b2', 'anna', 'VERDI', '+393330000012');
+select lives_ok($$ select public.merge_customers('00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b2') $$,
+  'merge con due telefoni eseguito');
+select is((select phone_e164 from public.customers where id = '00000000-0000-0000-0000-0000000000b2'), '+393330000012',
+  'il telefono dell''unito resta come alias');
+-- la registrazione va creata in uno statement a parte: dentro la stessa query non sarebbe visibile
+create temp table alias_token as
+  select public.register_for_event(p_slug => 'merge-tre', p_first_name => 'Anna', p_last_name => 'Verdi',
+    p_consent_privacy => true, p_consent_coupon => true, p_consent_marketing => false, p_privacy_version => 'v1',
+    p_phone_e164 => '+393330000012')->>'coupon_token' as token;
+select is((select r.customer_id from public.registrations r where r.coupon_token = (select token from alias_token)),
+  '00000000-0000-0000-0000-0000000000b1'::uuid, 'il telefono alias porta una registrazione al cliente tenuto');
+
+-- 24-26: catena, chi era già unito al cliente scartato viene riassegnato al cliente tenuto
+insert into public.customers (id, first_name, last_name) values
+  ('00000000-0000-0000-0000-0000000000d1', 'Dino', 'Neri'),
+  ('00000000-0000-0000-0000-0000000000f1', 'Kira', 'Neri');
+insert into public.customers (id, first_name, last_name, merged_into_id) values
+  ('00000000-0000-0000-0000-0000000000e1', 'Xena', 'Neri', '00000000-0000-0000-0000-0000000000d1');
+select lives_ok($$ select public.merge_customers('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000d1') $$,
+  'merge con catena eseguito');
+select is((select merged_into_id from public.customers where id = '00000000-0000-0000-0000-0000000000e1'),
+  '00000000-0000-0000-0000-0000000000f1'::uuid, 'catena: l''alias precedente punta al cliente tenuto');
+select is((select merged_into_id from public.customers where id = '00000000-0000-0000-0000-0000000000d1'),
+  '00000000-0000-0000-0000-0000000000f1'::uuid, 'catena: il cliente scartato punta al cliente tenuto');
+
+-- 27-28: un cliente già unito non si unisce di nuovo, né come scartato né come tenuto
+select throws_ok($$ select public.merge_customers('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000d1') $$,
+  'P0002', 'customer_not_found', 'cliente già unito rifiutato come scartato');
+select throws_ok($$ select public.merge_customers('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000f1') $$,
+  'P0002', 'customer_not_found', 'cliente già unito rifiutato come tenuto');
+
+-- 29-31: la pulizia GDPR cancella a cascata registrazioni e alias uniti
+insert into public.customers (id, first_name, last_name, last_activity_at) values
+  ('00000000-0000-0000-0000-0000000000a9', 'Vecchio', 'Due', now() - interval '14 months');
+insert into public.customers (id, first_name, last_name, merged_into_id) values
+  ('00000000-0000-0000-0000-0000000000aa', 'Alias', 'Vecchio', '00000000-0000-0000-0000-0000000000a9');
+insert into public.registrations (event_id, customer_id, coupon_code, consent_privacy_at, consent_coupon_at, consent_marketing, privacy_version) values
+  ('00000000-0000-0000-0000-00000000e101', '00000000-0000-0000-0000-0000000000a9', 'DDDDDD', now(), now(), false, 'v1');
+select is(public.purge_inactive_customers(), 1, 'pulizia: conta il solo cliente inattivo radice');
+select is((select count(*)::int from public.registrations where customer_id = '00000000-0000-0000-0000-0000000000a9'), 0,
+  'pulizia: registrazioni cancellate a cascata');
+select is((select count(*)::int from public.customers where id in ('00000000-0000-0000-0000-0000000000a9', '00000000-0000-0000-0000-0000000000aa')), 0,
+  'pulizia: cliente e alias uniti cancellati');
 
 select * from finish();
 rollback;
