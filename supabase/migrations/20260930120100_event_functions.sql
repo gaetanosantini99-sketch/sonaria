@@ -8,6 +8,10 @@ as $$
 declare
   v_attempt public.pin_attempts;
 begin
+  -- serializza i tentativi sulla stessa chiave: il for update da solo non blocca nulla
+  -- quando la riga non esiste ancora (primo tentativo, dopo un successo, dopo un blocco scaduto)
+  perform pg_advisory_xact_lock(hashtext(p_scope || ':' || p_key));
+
   select * into v_attempt from public.pin_attempts
    where scope = p_scope and key = p_key
    for update;
@@ -77,6 +81,10 @@ begin
 end;
 $$;
 
+-- un solo coupon per dispositivo e serata (difesa in profondità contro i doppi tap)
+create unique index registrations_event_device_uniq
+  on public.registrations (event_id, device_id) where device_id is not null;
+
 create or replace function public.register_for_event(
   p_slug text,
   p_first_name text,
@@ -116,6 +124,8 @@ begin
 
   -- stesso dispositivo già registrato a questa serata
   if p_device_id is not null then
+    -- serializza i doppi tap dallo stesso dispositivo sulla stessa serata
+    perform pg_advisory_xact_lock(hashtext(v_event.id::text || ':' || p_device_id::text));
     select coupon_token into v_token from public.registrations
      where event_id = v_event.id and device_id = p_device_id
      limit 1;
@@ -175,6 +185,13 @@ begin
        where event_id = v_event.id and customer_id = v_customer_id;
       if found then
         return jsonb_build_object('status', 'existing', 'coupon_token', v_token);
+      end if;
+      if p_device_id is not null then
+        select coupon_token into v_token from public.registrations
+         where event_id = v_event.id and device_id = p_device_id;
+        if found then
+          return jsonb_build_object('status', 'existing', 'coupon_token', v_token);
+        end if;
       end if;
       if v_attempt >= 10 then
         raise;

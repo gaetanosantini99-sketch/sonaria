@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(31);
+select plan(33);
 
 insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coupon_title, status, staff_token, staff_pin_hash) values
   ('00000000-0000-0000-0000-00000000e001', 'live-test', 'Live', 'Locale', now() - interval '1 hour', now() + interval '4 hours', 'Drink 5€', 'live', 'staff-live', extensions.crypt('1234', extensions.gen_salt('bf'))),
@@ -118,6 +118,18 @@ select lives_ok($$ select public.admin_set_event_pin('00000000-0000-0000-0000-00
 select is(public.verify_event_pin('staff-live', '5555')->>'status', 'ok', 'nuovo PIN valido');
 select throws_ok($$ select public.admin_set_event_pin('00000000-0000-0000-0000-00000000e001', 'abc') $$,
   '22023', 'invalid_pin', 'PIN non numerico rifiutato');
+
+-- 32: quattro tentativi errati non bloccano (semantica sequenziale con il lock advisory)
+insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coupon_title, status, staff_token, staff_pin_hash)
+values ('00000000-0000-0000-0000-00000000e007', 'pin4-test', 'Pin4', 'Locale', now() - interval '1 hour', now() + interval '4 hours', 'Drink', 'live', 'staff-pin4', extensions.crypt('4321', extensions.gen_salt('bf')));
+do $$ begin perform public.verify_event_pin('staff-pin4', '0000') from generate_series(1, 4); end $$;
+select is(public.verify_event_pin('staff-pin4', '4321')->>'status', 'ok', '4 PIN errati non bloccano: il PIN giusto passa');
+
+-- 33: un solo coupon per dispositivo e serata a livello di indice
+insert into public.customers (id, first_name, last_name) values ('00000000-0000-0000-0000-0000000000c9', 'Dup', 'Device');
+select throws_ok($$ insert into public.registrations (event_id, customer_id, coupon_code, consent_privacy_at, consent_coupon_at, consent_marketing, privacy_version, device_id)
+  values ('00000000-0000-0000-0000-00000000e001', '00000000-0000-0000-0000-0000000000c9', 'DUPDEV', now(), now(), false, 'v1', '00000000-0000-0000-0000-0000000000d1') $$,
+  '23505', null, 'secondo insert con stesso (serata, dispositivo) rifiutato');
 
 select * from finish();
 rollback;
