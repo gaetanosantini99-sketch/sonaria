@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0b0b10;
+  --color-surface: #16161f;
+  --color-border: #2a2a38;
+  --color-text: #f4f4f8;
+  --color-muted: #9a9ab0;
+  --color-accent: #c6ff3d;
+  --color-accent-contrast: #0b0b10;
+  --color-ok: #22c55e;
+  --color-danger: #ef4444;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+@layer components {
+  .card { @apply rounded-2xl border border-border bg-surface p-5; }
+  .label { @apply mb-1 block text-sm font-medium text-muted; }
+  .input { @apply w-full rounded-xl border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-accent; }
+  .btn { @apply inline-flex items-center justify-center rounded-xl px-5 py-3 font-semibold transition disabled:opacity-50; }
+  .btn-primary { @apply bg-accent text-accent-contrast hover:brightness-110; }
+  .btn-secondary { @apply border border-border bg-surface text-text hover:border-accent; }
+  .btn-danger { @apply bg-danger text-white hover:brightness-110; }
+  .field-error { @apply mt-1 text-sm text-danger; }
+}
