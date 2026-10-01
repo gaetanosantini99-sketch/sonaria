@@ -14,5 +14,5 @@ export function toCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {
     columns.map((c) => csvCell(c.header)).join(';'),
     ...rows.map((row) => columns.map((c) => csvCell(c.value(row))).join(';')),
   ];
-  return `﻿${lines.join('\r\n')}\r\n`;
+  return `\uFEFF${lines.join('\r\n')}\r\n`;
 }

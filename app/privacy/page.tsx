@@ -19,7 +19,7 @@ export default function PrivacyPage() {
       <h2 className="font-bold">Conservazione</h2>
       <p>I dati vengono cancellati dopo 12 mesi senza nuove registrazioni. Il consenso alle offerte scade dopo 30 giorni.</p>
       <h2 className="font-bold">Destinatari</h2>
-      <p>I dati sono ospitati da fornitori infrastrutturali (database e hosting). Gli sponsor delle offerte non ricevono i tuoi dati.</p>
+      <p>I dati sono ospitati da fornitori infrastrutturali (database e hosting). Per la protezione anti-bot del form usiamo Cloudflare Turnstile, che riceve l&apos;indirizzo IP del dispositivo. Gli sponsor delle offerte non ricevono i tuoi dati.</p>
       <h2 className="font-bold">I tuoi diritti</h2>
       <p>
         Puoi chiedere accesso, rettifica, cancellazione o revocare il consenso scrivendo a {DATA_CONTROLLER.email}. Puoi proporre
