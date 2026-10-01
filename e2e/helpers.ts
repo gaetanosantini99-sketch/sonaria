@@ -36,3 +36,20 @@ export async function createLiveEvent(page: Page, { title, pin }: { title: strin
   const staffPath = new URL(await page.getByTestId('staff-url').innerText()).pathname;
   return { id, title, publicPath, staffPath };
 }
+
+export async function registerCustomer(
+  page: Page,
+  publicPath: string,
+  { firstName, lastName, phone = '' }: { firstName: string; lastName: string; phone?: string },
+): Promise<string> {
+  await page.goto(publicPath);
+  await page.getByLabel('Nome', { exact: true }).fill(firstName);
+  await page.getByLabel('Cognome', { exact: true }).fill(lastName);
+  if (phone) await page.getByLabel('Telefono (facoltativo)').fill(phone);
+  await page.getByLabel(/informativa privacy/).check();
+  await page.getByLabel(/Accetto il coupon/).check();
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(/.+/, { timeout: 15_000 });
+  await page.getByRole('button', { name: 'Ottieni il coupon' }).click();
+  await expect(page).toHaveURL(/\/c\//);
+  return (await page.getByTestId('coupon-code').innerText()).trim();
+}
