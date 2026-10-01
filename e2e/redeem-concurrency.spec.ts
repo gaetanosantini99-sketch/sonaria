@@ -47,11 +47,17 @@ test('bruciature concorrenti: esattamente una va a buon fine', async () => {
     .eq('coupon_token', (reg as { coupon_token: string }).coupon_token)
     .single();
 
+  const { data: ver, error: verError } = await service.rpc('verify_event_pin', { p_staff_token: event.staff_token, p_pin: '1357' });
+  expect(verError).toBeNull();
+  const sessionKey = (ver as { session_key: string }).session_key;
+  expect(sessionKey).toBeTruthy();
+
   const results = await Promise.all(
     Array.from({ length: 8 }, () =>
-      service.rpc('redeem_event_coupon', { p_staff_token: event.staff_token, p_pin: '1357', p_code: row!.coupon_code }),
+      service.rpc('redeem_event_coupon', { p_staff_token: event.staff_token, p_session_key: sessionKey, p_code: row!.coupon_code }),
     ),
   );
+  results.forEach((r) => expect(r.error).toBeNull());
   const statuses = results.map((r) => (r.data as { status: string }).status);
   expect(statuses.filter((s) => s === 'ok')).toHaveLength(1);
   expect(statuses.filter((s) => s === 'already_used')).toHaveLength(7);
@@ -61,17 +67,28 @@ test('PIN errati in parallelo: il blocco vale anche sotto concorrenza', async ()
   const { asAdmin, service } = await clients();
   const event = await createLive(asAdmin, `pinlock-${Date.now()}`);
 
+  const { data: ver, error: verError } = await service.rpc('verify_event_pin', { p_staff_token: event.staff_token, p_pin: '1357' });
+  expect(verError).toBeNull();
+  const sessionKey = (ver as { session_key: string }).session_key;
+
   const results = await Promise.all(
     Array.from({ length: 8 }, () =>
       service.rpc('verify_event_pin', { p_staff_token: event.staff_token, p_pin: '0000' }),
     ),
   );
+  results.forEach((r) => expect(r.error).toBeNull());
   const statuses = results.map((r) => (r.data as { status: string }).status);
-  const wrong = statuses.filter((s) => s === 'wrong_pin');
-  const locked = statuses.filter((s) => s === 'locked');
-  expect(wrong.length).toBeLessThanOrEqual(5);
-  expect(wrong.length + locked.length).toBe(8);
+  expect(statuses.filter((s) => s === 'wrong_pin')).toHaveLength(5);
+  expect(statuses.filter((s) => s === 'locked')).toHaveLength(3);
 
-  const { data } = await service.rpc('verify_event_pin', { p_staff_token: event.staff_token, p_pin: '1357' });
+  const { data, error } = await service.rpc('verify_event_pin', { p_staff_token: event.staff_token, p_pin: '1357' });
+  expect(error).toBeNull();
   expect((data as { status: string }).status).toBe('locked');
+
+  // una chiave di sessione ottenuta prima del blocco continua a funzionare
+  const { data: red, error: redError } = await service.rpc('redeem_event_coupon', {
+    p_staff_token: event.staff_token, p_session_key: sessionKey, p_code: 'ZZZZZZ',
+  });
+  expect(redError).toBeNull();
+  expect((red as { status: string }).status).toBe('not_found');
 });

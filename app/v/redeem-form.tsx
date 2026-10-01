@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, type ReactNode } from 'react';
+import { useActionState } from 'react';
 import { formatRome } from '@/lib/dates';
 import { redeem, type RedeemResult, type RedeemState } from './actions';
 
@@ -14,18 +14,14 @@ function resultText(r: RedeemResult): string {
       return '⛔ Codice non trovato';
     case 'out_of_window':
       return '⛔ Fuori orario della serata';
-    case 'wrong_pin':
-    case 'locked':
     case 'unauthorized':
-      return '⚠️ Sessione scaduta: ricarica la pagina e reinserisci il PIN';
+      return '⚠️ Sessione non valida: apri il link della serata e inserisci il PIN';
     default:
       return '⚠️ Errore, riprova';
   }
 }
 
-// Se `pinForm` è presente la sessione è assente: l'esito resta visibile (lo stato vive
-// qui) anche quando la pagina, dopo la cancellazione del cookie, mostra il form del PIN.
-export function RedeemForm({ defaultCode = '', pinForm }: { defaultCode?: string; pinForm?: ReactNode }) {
+export function RedeemForm({ defaultCode = '' }: { defaultCode?: string }) {
   const [state, action, pending] = useActionState<RedeemState, FormData>(redeem, {});
   const r = state.result;
   return (
@@ -40,23 +36,21 @@ export function RedeemForm({ defaultCode = '', pinForm }: { defaultCode?: string
           <p className="mt-1 font-mono text-base opacity-80">{r.code}</p>
         </div>
       )}
-      {pinForm ?? (
-        <form action={action} className="card space-y-3">
-          <label className="label" htmlFor="code">Codice coupon</label>
-          <input
-            id="code"
-            name="code"
-            defaultValue={defaultCode}
-            autoFocus
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            maxLength={12}
-            className="input text-center font-mono text-3xl uppercase tracking-[0.3em]"
-          />
-          <button className="btn btn-primary w-full" disabled={pending}>Brucia coupon</button>
-        </form>
-      )}
+      <form action={action} className="card space-y-3">
+        <label className="label" htmlFor="code">Codice coupon</label>
+        <input
+          id="code"
+          name="code"
+          defaultValue={defaultCode}
+          autoFocus
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          maxLength={12}
+          className="input text-center font-mono text-3xl uppercase tracking-[0.3em]"
+        />
+        <button className="btn btn-primary w-full" disabled={pending}>Brucia coupon</button>
+      </form>
     </div>
   );
 }

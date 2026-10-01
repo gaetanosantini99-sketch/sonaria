@@ -9,8 +9,15 @@ import { RedeemForm } from '../redeem-form';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Area staff' };
 
-export default async function StaffPage({ params }: { params: Promise<{ staffToken: string }> }) {
+export default async function StaffPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ staffToken: string }>;
+  searchParams: Promise<{ expired?: string | string[] }>;
+}) {
   const { staffToken } = await params;
+  const { expired } = await searchParams;
   const { data: event, error } = await createAdminClient()
     .from('events')
     .select('title, venue_name, starts_at')
@@ -32,11 +39,22 @@ export default async function StaffPage({ params }: { params: Promise<{ staffTok
         <h1 className="text-2xl font-black">{event.title}</h1>
         <p className="text-muted">{event.venue_name} · {formatRome(event.starts_at)}</p>
       </header>
-      <RedeemForm pinForm={authed ? undefined : <PinForm staffToken={staffToken} />} />
-      {authed && (
-        <form action={logoutStaff.bind(null, staffToken)} className="text-center">
-          <button className="text-sm text-muted underline">Esci</button>
-        </form>
+      {authed ? (
+        <>
+          <RedeemForm />
+          <form action={logoutStaff.bind(null, staffToken)} className="text-center">
+            <button className="text-sm text-muted underline">Esci</button>
+          </form>
+        </>
+      ) : (
+        <>
+          {expired === '1' && (
+            <p data-testid="session-expired" role="status" className="rounded-2xl bg-danger p-4 text-center font-bold text-white">
+              Sessione scaduta: reinserisci il PIN
+            </p>
+          )}
+          <PinForm staffToken={staffToken} />
+        </>
       )}
     </main>
   );

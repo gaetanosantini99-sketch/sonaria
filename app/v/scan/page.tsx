@@ -6,8 +6,9 @@ import { RedeemForm } from '../redeem-form';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Area staff' };
 
-export default async function ScanPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
-  const { code = '' } = await searchParams;
+export default async function ScanPage({ searchParams }: { searchParams: Promise<{ code?: string | string[] }> }) {
+  const { code: rawCode } = await searchParams;
+  const code = (Array.isArray(rawCode) ? rawCode[0] : rawCode) ?? '';
   const session = await getStaffSession();
   let event: { title: string } | null = null;
   if (session) {

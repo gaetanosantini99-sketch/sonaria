@@ -197,7 +197,7 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: number
                            },
 "redeem_event_coupon":
-{ Args: { "p_code": string,"p_pin": string,"p_staff_token": string }; Returns: Json
+{ Args: { "p_code": string,"p_session_key": string,"p_staff_token": string }; Returns: Json
                            },
 "register_for_event":
 { Args: { "p_consent_coupon": boolean,"p_consent_marketing": boolean,"p_consent_privacy": boolean,"p_device_id"?: string,"p_first_name": string,"p_ip_hash"?: string,"p_last_name": string,"p_phone_e164"?: string,"p_privacy_version": string,"p_slug": string }; Returns: Json

@@ -46,12 +46,18 @@ set search_path = ''
 as $$
 declare
   v_hash text;
+  v_status text;
 begin
   select staff_pin_hash into v_hash from public.events where staff_token = p_staff_token;
   if not found then
     return jsonb_build_object('status', 'unauthorized');
   end if;
-  return jsonb_build_object('status', public.check_pin('event', p_staff_token, v_hash, p_pin));
+  v_status := public.check_pin('event', p_staff_token, v_hash, p_pin);
+  if v_status = 'ok' then
+    -- chiave di sessione derivata dall'hash del PIN: cambia quando il PIN cambia
+    return jsonb_build_object('status', 'ok', 'session_key', encode(extensions.digest(v_hash, 'sha256'), 'hex'));
+  end if;
+  return jsonb_build_object('status', v_status);
 end;
 $$;
 
@@ -203,7 +209,9 @@ begin
 end;
 $$;
 
-create or replace function public.redeem_event_coupon(p_staff_token text, p_pin text, p_code text)
+drop function if exists public.redeem_event_coupon(text, text, text);
+
+create function public.redeem_event_coupon(p_staff_token text, p_session_key text, p_code text)
 returns jsonb
 language plpgsql
 security definer
@@ -211,7 +219,6 @@ set search_path = ''
 as $$
 declare
   v_event public.events;
-  v_pin_status text;
   v_reg_id uuid;
   v_redeemed_at timestamptz;
   v_first_name text;
@@ -221,9 +228,10 @@ begin
     return jsonb_build_object('status', 'unauthorized');
   end if;
 
-  v_pin_status := public.check_pin('event', p_staff_token, v_event.staff_pin_hash, p_pin);
-  if v_pin_status <> 'ok' then
-    return jsonb_build_object('status', v_pin_status);
+  -- nessun conteggio tentativi qui: la chiave di sessione si ottiene solo con verify_event_pin
+  if v_event.staff_pin_hash is null or p_session_key is null
+     or p_session_key <> encode(extensions.digest(v_event.staff_pin_hash, 'sha256'), 'hex') then
+    return jsonb_build_object('status', 'session_expired');
   end if;
 
   select r.id, r.redeemed_at, c.first_name

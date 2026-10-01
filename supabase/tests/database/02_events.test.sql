@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(36);
+select plan(40);
 
 insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coupon_title, status, staff_token, staff_pin_hash) values
   ('00000000-0000-0000-0000-00000000e001', 'live-test', 'Live', 'Locale', now() - interval '1 hour', now() + interval '4 hours', 'Drink 5€', 'live', 'staff-live', extensions.crypt('1234', extensions.gen_salt('bf'))),
@@ -11,6 +11,10 @@ insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coup
   ('00000000-0000-0000-0000-00000000e006', 'lock-test', 'Lock', 'Locale', now() - interval '1 hour', now() + interval '4 hours', 'Drink', 'live', 'staff-lock', extensions.crypt('9999', extensions.gen_salt('bf')));
 
 create temp table res (k text primary key, v jsonb);
+create temp table keys (k text primary key, v text);
+-- chiavi di sessione (PIN 1234)
+insert into keys values ('live', public.verify_event_pin('staff-live', '1234')->>'session_key');
+insert into keys values ('past', public.verify_event_pin('staff-past', '1234')->>'session_key');
 
 -- 1: consensi obbligatori
 select is(
@@ -63,30 +67,33 @@ select is(public.register_for_event(p_slug => 'closed-test', p_first_name => 'X'
   'event_closed', 'serata chiusa');
 
 -- 15-20: bruciatura
-select is(public.redeem_event_coupon('staff-live', '0000',
+select is(public.redeem_event_coupon('staff-live', 'chiave-sbagliata',
   (select coupon_code from public.registrations where coupon_token = (select v->>'coupon_token' from res where k = 'r1')))->>'status',
-  'wrong_pin', 'PIN errato');
-select is(public.redeem_event_coupon('staff-live', '1234',
+  'session_expired', 'chiave di sessione errata');
+select is(public.redeem_event_coupon('staff-live', (select v from keys where k = 'live'),
   (select coupon_code from public.registrations where coupon_token = (select v->>'coupon_token' from res where k = 'r1')))->>'status',
   'ok', 'coupon bruciato');
-select is(public.redeem_event_coupon('staff-live', '1234',
+select is(public.redeem_event_coupon('staff-live', (select v from keys where k = 'live'),
   (select coupon_code from public.registrations where coupon_token = (select v->>'coupon_token' from res where k = 'r1')))->>'status',
   'already_used', 'secondo utilizzo rifiutato');
-select is(public.redeem_event_coupon('staff-live', '1234', 'ZZZZZZ')->>'status', 'not_found', 'codice inesistente');
-select is(public.redeem_event_coupon('staff-live', '1234',
+select is(public.redeem_event_coupon('staff-live', (select v from keys where k = 'live'), 'ZZZZZZ')->>'status', 'not_found', 'codice inesistente');
+select is(public.redeem_event_coupon('staff-live', (select v from keys where k = 'live'),
   lower((select coupon_code from public.registrations where coupon_token = (select v->>'coupon_token' from res where k = 'r4'))))->>'status',
   'ok', 'codice minuscolo accettato');
-select is(public.redeem_event_coupon('staff-sconosciuto', '1234', 'ZZZZZZ')->>'status', 'unauthorized', 'token staff sconosciuto');
+select is(public.redeem_event_coupon('staff-sconosciuto', (select v from keys where k = 'live'), 'ZZZZZZ')->>'status', 'unauthorized', 'token staff sconosciuto');
 
 -- 21: fuori orario
 insert into public.registrations (event_id, customer_id, coupon_code, consent_privacy_at, consent_coupon_at, consent_marketing, privacy_version)
 select '00000000-0000-0000-0000-00000000e005', id, 'PAST22', now(), now(), false, 'v1'
   from public.customers where phone_e164 = '+393331234567';
-select is(public.redeem_event_coupon('staff-past', '1234', 'PAST22')->>'status', 'out_of_window', 'serata finita da oltre un''ora');
+select is(public.redeem_event_coupon('staff-past', (select v from keys where k = 'past'), 'PAST22')->>'status', 'out_of_window', 'serata finita da oltre un''ora');
 
 -- 22-23: blocco dopo 5 PIN errati
-do $$ begin perform public.redeem_event_coupon('staff-lock', '0000', 'ZZZZZZ') from generate_series(1, 5); end $$;
+insert into keys values ('lock', public.verify_event_pin('staff-lock', '9999')->>'session_key');
+do $$ begin perform public.verify_event_pin('staff-lock', '0000') from generate_series(1, 5); end $$;
 select is(public.verify_event_pin('staff-lock', '9999')->>'status', 'locked', 'bloccato dopo 5 PIN errati anche con PIN giusto');
+select is(public.redeem_event_coupon('staff-lock', (select v from keys where k = 'lock'), 'ZZZZZZ')->>'status', 'not_found',
+  'con il PIN bloccato una chiave valida continua a bruciare');
 select is(public.verify_event_pin('staff-live', '1234')->>'status', 'ok', 'verify_event_pin con PIN corretto');
 
 -- 24: rate limit per IP
@@ -116,6 +123,10 @@ insert into public.admins (user_id) values ('00000000-0000-0000-0000-0000000000a
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000000a1","role":"authenticated"}', true);
 select lives_ok($$ select public.admin_set_event_pin('00000000-0000-0000-0000-00000000e001', '5555') $$, 'l''admin cambia il PIN');
 select is(public.verify_event_pin('staff-live', '5555')->>'status', 'ok', 'nuovo PIN valido');
+select is(public.redeem_event_coupon('staff-live', (select v from keys where k = 'live'), 'ZZZZZZ')->>'status', 'session_expired',
+  'dopo il cambio PIN la vecchia chiave non vale piu');
+select is(public.redeem_event_coupon('staff-live', public.verify_event_pin('staff-live', '5555')->>'session_key', 'ZZZZZZ')->>'status', 'not_found',
+  'la nuova chiave funziona');
 select throws_ok($$ select public.admin_set_event_pin('00000000-0000-0000-0000-00000000e001', 'abc') $$,
   '22023', 'invalid_pin', 'PIN non numerico rifiutato');
 
@@ -124,6 +135,10 @@ insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coup
 values ('00000000-0000-0000-0000-00000000e007', 'pin4-test', 'Pin4', 'Locale', now() - interval '1 hour', now() + interval '4 hours', 'Drink', 'live', 'staff-pin4', extensions.crypt('4321', extensions.gen_salt('bf')));
 do $$ begin perform public.verify_event_pin('staff-pin4', '0000') from generate_series(1, 4); end $$;
 select is(public.verify_event_pin('staff-pin4', '4321')->>'status', 'ok', '4 PIN errati non bloccano: il PIN giusto passa');
+
+-- 5 bruciature con chiave obsoleta non creano blocchi
+do $$ begin perform public.redeem_event_coupon('staff-pin4', 'obsoleta', 'ZZZZZZ') from generate_series(1, 5); end $$;
+select is(public.verify_event_pin('staff-pin4', '4321')->>'status', 'ok', '5 bruciature con chiave obsoleta non bloccano il PIN');
 
 -- 33: un solo coupon per dispositivo e serata a livello di indice
 insert into public.customers (id, first_name, last_name) values ('00000000-0000-0000-0000-0000000000c9', 'Dup', 'Device');
