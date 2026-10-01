@@ -1,4 +1,6 @@
 name: backup
+permissions:
+  contents: read
 on:
   schedule:
     - cron: '0 3 * * 0'
@@ -18,7 +20,8 @@ jobs:
         run: |
           supabase db dump --db-url "$DB_URL" -f roles.sql --role-only
           supabase db dump --db-url "$DB_URL" -f schema.sql
-          supabase db dump --db-url "$DB_URL" -f data.sql --use-copy --data-only
+          supabase db dump --db-url "$DB_URL" -f data.sql --use-copy --data-only --schema public
+          test -s data.sql
           tar czf backup.tgz roles.sql schema.sql data.sql
           age -r "$AGE_RECIPIENT" -o backup.tgz.age backup.tgz
           rm backup.tgz roles.sql schema.sql data.sql

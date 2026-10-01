@@ -41,6 +41,7 @@ Cancella il file subito dopo.
    - `SUPABASE_DB_URL` = connection string "Session pooler" (porta 5432) presa da Supabase → Connect
    - `AGE_RECIPIENT` = la chiave pubblica (`age1...`) stampata da `age-keygen`
 3. Lancia a mano `keepalive` e `backup` (Actions → Run workflow) e controlla che finiscano in verde.
+4. Prova un ripristino completo almeno una volta su un progetto di prova: un backup mai ripristinato non è un backup.
 
 ## 6. Privacy
 Compila `DATA_CONTROLLER` in `lib/privacy.ts` e fai validare `app/privacy/page.tsx` da un consulente. Se il testo cambia nella sostanza, incrementa `PRIVACY_VERSION`.
@@ -65,12 +66,18 @@ Compila `DATA_CONTROLLER` in `lib/privacy.ts` e fai validare `app/privacy/page.t
    ```
 
 ## Ripristino da backup
-```bash
-age -d -i backup-key.txt -o backup.tgz backup.tgz.age
-tar xzf backup.tgz
-psql "$DB_URL" --single-transaction -v ON_ERROR_STOP=1 \
-  -f roles.sql -f schema.sql -c 'SET session_replication_role = replica' -f data.sql
-```
+Si ripristina in un **nuovo** progetto Supabase pulito. `schema.sql` e `roles.sql` nell'archivio sono solo di riferimento.
+1. Crea un nuovo progetto Supabase, poi `npx supabase link --project-ref <nuovo-ref>` e `npx supabase db push` (lo schema arriva dalle migrazioni, non dal dump).
+2. Decifra ed estrai:
+   ```bash
+   age -d -i backup-key.txt -o backup.tgz backup.tgz.age && tar xzf backup.tgz
+   ```
+3. Carica solo i dati:
+   ```bash
+   psql "<connection-string-del-nuovo-progetto>" --single-transaction -v ON_ERROR_STOP=1 -c "SET session_replication_role = replica" -f data.sql
+   ```
+4. Gli utenti di Supabase Auth NON sono nel backup: esegui `delete from public.admins;` dal SQL editor e ricrea l'account del PR con `scripts/create-admin.ts` (vedi §4).
+5. Aggiorna le variabili d'ambiente su Netlify (URL e chiavi del nuovo progetto) e i secret GitHub (`SUPABASE_DB_URL`), poi rifai lo smoke test.
 
 ## Limiti noti e rischi accettati
 - Il telefono non è verificato: chi conosce il numero di una persona già registrata alla stessa serata può riaprire il suo coupon (mitigazione futura: OTP).
