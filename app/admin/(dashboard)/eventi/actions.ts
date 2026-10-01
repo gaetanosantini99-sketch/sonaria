@@ -31,7 +31,10 @@ export async function createEvent(_prev: EventFormState, formData: FormData): Pr
   if (error || !event) return { errors: { form: 'Errore nel salvataggio, riprova' }, values: formValues(formData) };
 
   const { error: pinError } = await supabase.rpc('admin_set_event_pin', { p_event_id: event.id, p_pin: pin! });
-  if (pinError) return { errors: { pin: 'PIN non salvato: impostalo dalla pagina della serata' }, values: formValues(formData) };
+  if (pinError) {
+    await supabase.from('events').delete().eq('id', event.id);
+    return { errors: { form: 'Errore nel salvataggio del PIN, riprova' }, values: formValues(formData) };
+  }
 
   revalidatePath('/admin/eventi');
   redirect(`/admin/eventi/${event.id}`);

@@ -53,6 +53,16 @@ describe('parseEventForm', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors.pin).toBe('Il PIN deve avere da 4 a 8 cifre');
   });
+  it('non lancia con date impossibili', () => {
+    const a = parseEventForm(form({ starts_at: '2026-13-45T99:99' }), { pinRequired: true });
+    expect(a.ok).toBe(false);
+    if (!a.ok) expect(a.errors.starts_at).toBe('Data e ora non valide');
+    const b = parseEventForm(form({ ends_at: '2026-13-45T99:99' }), { pinRequired: true });
+    expect(b.ok).toBe(false);
+    if (!b.ok) expect(b.errors.ends_at).toBe('Data e ora non valide');
+    const c = parseEventForm(form({ starts_at: '2026-02-31T10:00' }), { pinRequired: true });
+    expect(c.ok).toBe(false);
+  });
   it('PIN vuoto in modifica significa invariato', () => {
     const r = parseEventForm(form({ pin: '' }), { pinRequired: false });
     expect(r.ok && r.data.pin).toBe(null);

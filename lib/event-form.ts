@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { romeLocalToUtcIso } from '@/lib/dates';
+import { romeLocalToUtcIso, utcToRomeLocalInput } from '@/lib/dates';
 
 const localDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, 'Data e ora obbligatorie');
 
@@ -27,6 +27,16 @@ export type EventInput = {
 
 export type EventFormResult = { ok: true; data: EventInput } | { ok: false; errors: Record<string, string> };
 
+function safeUtcIso(local: string): string | null {
+  try {
+    const iso = romeLocalToUtcIso(local);
+    // scarta date impossibili che verrebbero "aggiustate" (es. 31 febbraio)
+    return utcToRomeLocalInput(iso) === local ? iso : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseEventForm(formData: FormData, { pinRequired }: { pinRequired: boolean }): EventFormResult {
   const raw = Object.fromEntries(FIELDS.map((k) => [k, String(formData.get(k) ?? '')]));
   const parsed = schema.safeParse(raw);
@@ -38,10 +48,12 @@ export function parseEventForm(formData: FormData, { pinRequired }: { pinRequire
   const d = parsed.data;
   if (d.pin === '' && pinRequired) errors.pin = 'PIN obbligatorio';
   if (d.pin !== '' && !/^\d{4,8}$/.test(d.pin)) errors.pin = 'Il PIN deve avere da 4 a 8 cifre';
-  const startsAt = romeLocalToUtcIso(d.starts_at);
-  const endsAt = romeLocalToUtcIso(d.ends_at);
-  if (Date.parse(endsAt) <= Date.parse(startsAt)) errors.ends_at = "La fine deve essere dopo l'inizio";
-  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  const startsAt = safeUtcIso(d.starts_at);
+  const endsAt = safeUtcIso(d.ends_at);
+  if (!startsAt) errors.starts_at = 'Data e ora non valide';
+  if (!endsAt) errors.ends_at = 'Data e ora non valide';
+  if (startsAt && endsAt && Date.parse(endsAt) <= Date.parse(startsAt)) errors.ends_at = "La fine deve essere dopo l'inizio";
+  if (Object.keys(errors).length > 0 || !startsAt || !endsAt) return { ok: false, errors };
   return {
     ok: true,
     data: {
