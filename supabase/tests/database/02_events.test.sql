@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(33);
+select plan(36);
 
 insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coupon_title, status, staff_token, staff_pin_hash) values
   ('00000000-0000-0000-0000-00000000e001', 'live-test', 'Live', 'Locale', now() - interval '1 hour', now() + interval '4 hours', 'Drink 5€', 'live', 'staff-live', extensions.crypt('1234', extensions.gen_salt('bf'))),
@@ -130,6 +130,18 @@ insert into public.customers (id, first_name, last_name) values ('00000000-0000-
 select throws_ok($$ insert into public.registrations (event_id, customer_id, coupon_code, consent_privacy_at, consent_coupon_at, consent_marketing, privacy_version, device_id)
   values ('00000000-0000-0000-0000-00000000e001', '00000000-0000-0000-0000-0000000000c9', 'DUPDEV', now(), now(), false, 'v1', '00000000-0000-0000-0000-0000000000d1') $$,
   '23505', null, 'secondo insert con stesso (serata, dispositivo) rifiutato');
+
+-- 34-36: il consenso offerte non si estende senza una nuova registrazione
+insert into res values ('m1', public.register_for_event(p_slug => 'live-test', p_first_name => 'Gina', p_last_name => 'Neri',
+  p_consent_privacy => true, p_consent_coupon => true, p_consent_marketing => false, p_privacy_version => 'v1',
+  p_phone_e164 => '+393339990000', p_device_id => '00000000-0000-0000-0000-0000000000d8'));
+insert into res values ('m2', public.register_for_event(p_slug => 'live-test', p_first_name => 'Gina', p_last_name => 'Neri',
+  p_consent_privacy => true, p_consent_coupon => true, p_consent_marketing => true, p_privacy_version => 'v1',
+  p_phone_e164 => '+393339990000', p_device_id => '00000000-0000-0000-0000-0000000000d9'));
+select is((select v->>'status' from res where k = 'm1'), 'created', 'registrazione senza consenso offerte creata');
+select is((select v->>'status' from res where k = 'm2'), 'existing', 'seconda richiesta: coupon esistente');
+select is((select marketing_consent_until from public.customers where phone_e164 = '+393339990000'), null::timestamptz,
+  'consenso offerte non esteso senza nuova registrazione');
 
 select * from finish();
 rollback;

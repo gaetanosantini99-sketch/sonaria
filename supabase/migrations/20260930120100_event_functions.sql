@@ -154,11 +154,7 @@ begin
   end if;
 
   update public.customers
-     set last_activity_at = now(),
-         marketing_consent_until = case
-           when p_consent_marketing then greatest(marketing_consent_until, now() + interval '30 days')
-           else marketing_consent_until
-         end
+     set last_activity_at = now()
    where id = v_customer_id;
 
   select coupon_token into v_token from public.registrations
@@ -178,6 +174,12 @@ begin
         coalesce(p_consent_marketing, false), p_privacy_version, p_device_id, p_ip_hash
       )
       returning coupon_token into v_token;
+      -- il consenso offerte cambia solo con una nuova registrazione (evidenza)
+      if p_consent_marketing then
+        update public.customers
+           set marketing_consent_until = greatest(marketing_consent_until, now() + interval '30 days')
+         where id = v_customer_id;
+      end if;
       return jsonb_build_object('status', 'created', 'coupon_token', v_token);
     exception when unique_violation then
       -- registrazione concorrente dello stesso cliente, oppure collisione del codice

@@ -43,7 +43,10 @@ export async function register(slug: string, _prev: RegisterState, formData: For
     p_device_id: deviceId,
     p_ip_hash: ip ? hashIp(ip, env('IP_HASH_SALT')) : undefined,
   });
-  if (error) return { errors: { form: 'Errore imprevisto, riprova' }, values };
+  if (error || !data || typeof data !== 'object') {
+    console.error('register_for_event failed', error);
+    return { errors: { form: 'Errore imprevisto, riprova' }, values };
+  }
 
   const result = data as unknown as { status: string; coupon_token?: string };
   if ((result.status === 'created' || result.status === 'existing') && result.coupon_token) {

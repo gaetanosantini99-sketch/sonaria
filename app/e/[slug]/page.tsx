@@ -12,23 +12,31 @@ export const metadata = { title: 'Il tuo coupon per la serata' };
 export default async function EventRegistrationPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const supabase = createAdminClient();
-  const { data: event } = await supabase
+  const { data: event, error: eventError } = await supabase
     .from('events')
     .select('id, title, venue_name, starts_at, ends_at, coupon_title, coupon_description, status')
     .eq('slug', slug)
     .neq('status', 'draft')
     .maybeSingle();
+  if (eventError) {
+    console.error('event lookup failed', eventError);
+    throw new Error('Errore temporaneo');
+  }
   if (!event) notFound();
 
   const deviceId = await readDeviceId();
   if (deviceId) {
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('registrations')
       .select('coupon_token')
       .eq('event_id', event.id)
       .eq('device_id', deviceId)
       .limit(1)
       .maybeSingle();
+    if (existingError) {
+      console.error('registration lookup failed', existingError);
+      throw new Error('Errore temporaneo');
+    }
     if (existing) redirect(`/c/${existing.coupon_token}`);
   }
 

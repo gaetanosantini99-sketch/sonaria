@@ -10,11 +10,15 @@ export const metadata = { title: 'Il tuo coupon' };
 
 export default async function CouponPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const { data: reg } = await createAdminClient()
+  const { data: reg, error } = await createAdminClient()
     .from('registrations')
     .select('coupon_code, redeemed_at, customers(first_name), events(title, venue_name, starts_at, ends_at, coupon_title, coupon_description)')
     .eq('coupon_token', token)
     .maybeSingle();
+  if (error) {
+    console.error('coupon lookup failed', error);
+    throw new Error('Errore temporaneo');
+  }
   if (!reg?.events) notFound();
 
   const event = reg.events;

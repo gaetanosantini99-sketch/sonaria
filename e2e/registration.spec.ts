@@ -45,3 +45,23 @@ test('slug inesistente: pagina non trovata', async ({ page }) => {
   await page.goto('/e/non-esiste-xyz9');
   await expect(page.getByText('Pagina non trovata')).toBeVisible();
 });
+
+test('senza verifica anti-bot la registrazione è rifiutata', async ({ browser }) => {
+  const admin = await browser.newPage();
+  await loginAsAdmin(admin);
+  const event = await createLiveEvent(admin, { title: `Antibot ${Date.now()}`, pin: '1234' });
+
+  const page = await browser.newPage();
+  await page.goto(event.publicPath);
+  await page.getByLabel('Nome', { exact: true }).fill('Luca');
+  await page.getByLabel('Cognome', { exact: true }).fill('Gialli');
+  await page.getByLabel(/informativa privacy/).check();
+  await page.getByLabel(/Accetto il coupon/).check();
+  await expect(page.locator('input[name="cf-turnstile-response"]')).toHaveValue(/.+/, { timeout: 15_000 });
+  await page.evaluate(() => {
+    document.querySelector<HTMLInputElement>('input[name="cf-turnstile-response"]')!.value = '';
+  });
+  await page.getByRole('button', { name: 'Ottieni il coupon' }).click();
+  await expect(page.getByText('Verifica anti-bot non riuscita, riprova')).toBeVisible();
+  await expect(page).toHaveURL(/\/e\//);
+});
