@@ -22,7 +22,7 @@ export async function GET() {
   const supabase = await requireAdmin();
   const rows: Row[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase.from('customer_overview').select('*').order('created_at').range(from, from + 999);
+    const { data, error } = await supabase.from('customer_overview').select('*').order('created_at').order('id').range(from, from + 999);
     if (error) {
       console.error('Export clienti non riuscito', error);
       return new Response('Errore durante l’export', { status: 500 });

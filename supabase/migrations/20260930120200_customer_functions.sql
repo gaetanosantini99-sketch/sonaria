@@ -6,11 +6,14 @@ select e.id as event_id,
   left join public.registrations r on r.event_id = e.id
  group by e.id;
 
+create extension if not exists unaccent with schema extensions;
+
 create or replace view public.customer_overview with (security_invoker = true) as
 select c.id, c.first_name, c.last_name, c.phone_e164, c.marketing_consent_until,
        c.created_at, c.last_activity_at,
        count(r.id)::int as events_count,
-       count(r.redeemed_at)::int as redeemed_count
+       count(r.redeemed_at)::int as redeemed_count,
+       lower(extensions.unaccent(c.first_name || ' ' || c.last_name || ' ' || coalesce(c.phone_e164, ''))) as search_text
   from public.customers c
   left join public.registrations r on r.customer_id = c.id
  where c.merged_into_id is null

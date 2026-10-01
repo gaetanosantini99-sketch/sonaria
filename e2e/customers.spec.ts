@@ -26,8 +26,38 @@ test('il PR trova, unisce ed esporta i clienti', async ({ browser }) => {
   const res = await admin.request.get('/admin/clienti/export');
   expect(res.status()).toBe(200);
   expect(res.headers()['content-type']).toContain('text/csv');
-  expect((await res.text()).toLowerCase()).toContain(lastName.toLowerCase());
+  expect(res.headers()['cache-control']).toContain('no-store');
+  const body = await res.text();
+  expect(body.startsWith('\uFEFFNome;Cognome;Telefono;')).toBe(true);
+  expect(body.slice(1).split('\r\n')[0]).toBe(
+    'Nome;Cognome;Telefono;Serate;Coupon usati;Consenso offerte fino al;Ultima attività;Primo contatto',
+  );
+  expect(body.toLowerCase()).toContain(lastName.toLowerCase());
+
+  await admin.goto('/admin/clienti?page=999');
+  await expect(admin.getByRole('heading', { name: /^Clienti/ })).toBeVisible();
 
   await admin.goto('/admin');
   await expect(admin.getByText('Clienti totali')).toBeVisible();
+});
+
+test('la ricerca ignora accenti e maiuscole', async ({ browser }) => {
+  const admin = await browser.newPage();
+  await loginAsAdmin(admin);
+  const event = await createLiveEvent(admin, { title: `Accenti ${Date.now()}`, pin: '1234' });
+  const lastName = `Accento${Date.now().toString(36)}`;
+  await registerCustomer(await browser.newPage(), event.publicPath, { firstName: 'Niccolò', lastName });
+
+  await admin.goto(`/admin/clienti?q=niccolo%20${lastName.toLowerCase()}`);
+  await expect(admin.locator('tbody tr')).toHaveCount(1);
+  await admin.goto(`/admin/clienti?q=NICCOLÒ%20${lastName}`);
+  await expect(admin.locator('tbody tr')).toHaveCount(1);
+});
+
+test("l'export non è accessibile senza login", async ({ browser }) => {
+  const context = await browser.newContext();
+  const res = await context.request.get('/admin/clienti/export');
+  expect(res.headers()['content-type'] ?? '').not.toContain('text/csv');
+  expect(res.url()).toContain('/admin/login');
+  await context.close();
 });

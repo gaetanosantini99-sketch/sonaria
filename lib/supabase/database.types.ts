@@ -153,7 +153,7 @@ isOneToOne: false
           Views: {
             "customer_overview": {
                   Row: {
-                    "created_at": string | null,"events_count": number | null,"first_name": string | null,"id": string | null,"last_activity_at": string | null,"last_name": string | null,"marketing_consent_until": string | null,"phone_e164": string | null,"redeemed_count": number | null
+                    "created_at": string | null,"events_count": number | null,"first_name": string | null,"id": string | null,"last_activity_at": string | null,"last_name": string | null,"marketing_consent_until": string | null,"phone_e164": string | null,"redeemed_count": number | null,"search_text": string | null
                   }
                   Relationships: [
                     

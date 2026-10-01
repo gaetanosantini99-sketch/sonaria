@@ -8,33 +8,46 @@ const PAGE_SIZE = 50;
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   const { q = '', page = '1' } = await searchParams;
-  const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
+  const requestedPage = Math.max(1, Number.parseInt(page, 10) || 1);
   const supabase = await requireAdmin();
+  const terms = searchTerms(q);
 
-  let query = supabase
-    .from('customer_overview')
-    .select('*', { count: 'exact' })
-    .order('last_activity_at', { ascending: false })
-    .range((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE - 1);
-  for (const term of searchTerms(q)) {
-    query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,phone_e164.ilike.%${term}%`);
-  }
-  const [{ data: customers, count, error }, { count: duplicates, error: duplicatesError }] = await Promise.all([
-    query,
+  const filtered = () => {
+    let query = supabase.from('customer_overview').select('*', { count: 'exact', head: true });
+    for (const term of terms) query = query.ilike('search_text', `%${term}%`);
+    return query;
+  };
+  const [{ count: total, error: countError }, { count: duplicates, error: duplicatesError }] = await Promise.all([
+    filtered(),
     supabase.from('duplicate_candidates').select('a_id', { count: 'exact', head: true }),
   ]);
-  if (error || duplicatesError) {
-    console.error('Lettura clienti non riuscita', error ?? duplicatesError);
+  if (countError || duplicatesError) {
+    console.error('Lettura clienti non riuscita', countError ?? duplicatesError);
+    throw new Error('Errore temporaneo');
+  }
+  const count = total ?? 0;
+  const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const pageNum = Math.min(requestedPage, pages);
+
+  let listQuery = supabase
+    .from('customer_overview')
+    .select('*')
+    .order('last_activity_at', { ascending: false, nullsFirst: false })
+    .order('id')
+    .range((pageNum - 1) * PAGE_SIZE, pageNum * PAGE_SIZE - 1);
+  for (const term of terms) listQuery = listQuery.ilike('search_text', `%${term}%`);
+  const { data: customers, error } = await listQuery;
+  if (error) {
+    console.error('Lettura clienti non riuscita', error);
     throw new Error('Errore temporaneo');
   }
   const now = new Date();
-  const pages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
   const pageHref = (n: number) => `/admin/clienti?${new URLSearchParams({ q, page: String(n) })}`;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Clienti ({count ?? 0})</h1>
+        <h1 className="text-2xl font-bold">Clienti ({count})</h1>
         {/* download di un file da un route handler: deve essere un link normale, non una navigazione client */}
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href="/admin/clienti/export" className="btn btn-secondary">Esporta CSV</a>

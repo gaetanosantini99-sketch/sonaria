@@ -15,9 +15,12 @@ describe('csv', () => {
   it('neutralizza le formule per Excel', () => {
     expect(csvCell('=SUM(A1)')).toBe("'=SUM(A1)");
     expect(csvCell('+393331234567')).toBe("'+393331234567");
+    expect(csvCell('-1+1')).toBe("'-1+1");
+    expect(csvCell('@cmd')).toBe("'@cmd");
+    expect(csvCell('\tx')).toBe("'\tx");
   });
   it('BOM, intestazioni e CRLF', () => {
     const csv = toCsv([{ n: 'Anna' }], [{ header: 'Nome', value: (r) => r.n }]);
-    expect(csv).toBe('﻿Nome\r\nAnna\r\n');
+    expect(csv).toBe('\uFEFFNome\r\nAnna\r\n');
   });
 });

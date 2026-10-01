@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(31);
+select plan(33);
 
 insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000a1', 'admin@test.local');
 insert into public.admins (user_id) values ('00000000-0000-0000-0000-0000000000a1');
@@ -126,6 +126,12 @@ select is((select count(*)::int from public.registrations where customer_id = '0
   'pulizia: registrazioni cancellate a cascata');
 select is((select count(*)::int from public.customers where id in ('00000000-0000-0000-0000-0000000000a9', '00000000-0000-0000-0000-0000000000aa')), 0,
   'pulizia: cliente e alias uniti cancellati');
+
+-- ricerca senza accenti
+insert into public.customers (id, first_name, last_name) values
+  ('00000000-0000-0000-0000-0000000000c5', 'Niccolò', 'D''Angelo');
+select ok((select search_text like '%niccolo%' from public.customer_overview where id = '00000000-0000-0000-0000-0000000000c5'), 'search_text senza accenti');
+select ok((select search_text like '%d''angelo%' from public.customer_overview where id = '00000000-0000-0000-0000-0000000000c5'), 'search_text minuscolo con apostrofo');
 
 select * from finish();
 rollback;
