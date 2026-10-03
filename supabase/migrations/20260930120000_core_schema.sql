@@ -79,7 +79,6 @@ create table public.registrations (
   unique (event_id, customer_id),
   unique (event_id, coupon_code)
 );
-create index registrations_event_device_idx on public.registrations (event_id, device_id);
 create index registrations_ip_recent_idx on public.registrations (ip_hash, created_at);
 create index registrations_customer_idx on public.registrations (customer_id);
 
@@ -120,10 +119,11 @@ create policy registrations_admin_all on public.registrations
 revoke all on table public.admins, public.events, public.customers, public.registrations, public.pin_attempts from anon;
 revoke all on table public.pin_attempts from authenticated;
 
--- gen_token / gen_code servono ad authenticated come default delle colonne negli insert dell'admin
+-- gen_token serve ad authenticated come default di colonna negli insert dell'admin; gen_code lo usano solo le funzioni security definer
 revoke execute on function public.gen_token() from public, anon;
 revoke execute on function public.gen_code() from public, anon;
 grant execute on function public.gen_token() to authenticated, service_role;
-grant execute on function public.gen_code() to authenticated, service_role;
+revoke execute on function public.gen_code() from authenticated;
+grant execute on function public.gen_code() to service_role;
 revoke execute on function public.is_admin() from public, anon;
 grant execute on function public.is_admin() to authenticated, service_role;

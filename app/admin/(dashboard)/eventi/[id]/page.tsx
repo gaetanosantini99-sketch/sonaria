@@ -5,7 +5,8 @@ import { formatRome, utcToRomeLocalInput } from '@/lib/dates';
 import { EVENT_STATUSES, STATUS_ACTION_LABEL, STATUS_LABEL, type EventStatus } from '@/lib/event-status';
 import { qrSvg } from '@/lib/qr';
 import { siteUrl } from '@/lib/site';
-import { setEventStatus, updateEvent } from '../actions';
+import { ConfirmButton } from '@/components/confirm-button';
+import { deleteEvent, setEventStatus, updateEvent } from '../actions';
 import { EventForm } from '../event-form';
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -46,6 +47,13 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             <button className="btn btn-secondary">{STATUS_ACTION_LABEL[s]}</button>
           </form>
         ))}
+        {(stats?.registrations ?? 0) === 0 && (
+          <form action={deleteEvent.bind(null, event.id)}>
+            <ConfirmButton className="btn btn-danger" message="Eliminare definitivamente questa serata?">
+              Elimina serata
+            </ConfirmButton>
+          </form>
+        )}
       </div>
 
       <section className="grid gap-4 md:grid-cols-2">

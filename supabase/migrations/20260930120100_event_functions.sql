@@ -113,6 +113,7 @@ declare
   v_customer_id uuid;
   v_token text;
   v_attempt int := 0;
+  v_name_matches boolean;
 begin
   if not coalesce(p_consent_privacy, false) or not coalesce(p_consent_coupon, false) then
     return jsonb_build_object('status', 'consent_required');
@@ -163,6 +164,12 @@ begin
      set last_activity_at = now()
    where id = v_customer_id;
 
+  -- il telefono non è verificato: il consenso offerte vale solo se anche il nome coincide con la scheda
+  select lower(trim(first_name)) = lower(trim(p_first_name))
+     and lower(trim(last_name)) = lower(trim(p_last_name))
+    into v_name_matches
+    from public.customers where id = v_customer_id;
+
   select coupon_token into v_token from public.registrations
    where event_id = v_event.id and customer_id = v_customer_id;
   if found then
@@ -177,11 +184,11 @@ begin
         consent_marketing, privacy_version, device_id, ip_hash
       ) values (
         v_event.id, v_customer_id, public.gen_code(), now(), now(),
-        coalesce(p_consent_marketing, false), p_privacy_version, p_device_id, p_ip_hash
+        coalesce(p_consent_marketing, false) and coalesce(v_name_matches, false), p_privacy_version, p_device_id, p_ip_hash
       )
       returning coupon_token into v_token;
       -- il consenso offerte cambia solo con una nuova registrazione (evidenza)
-      if p_consent_marketing then
+      if p_consent_marketing and coalesce(v_name_matches, false) then
         update public.customers
            set marketing_consent_until = greatest(marketing_consent_until, now() + interval '30 days')
          where id = v_customer_id;
@@ -209,9 +216,7 @@ begin
 end;
 $$;
 
-drop function if exists public.redeem_event_coupon(text, text, text);
-
-create function public.redeem_event_coupon(p_staff_token text, p_session_key text, p_code text)
+create or replace function public.redeem_event_coupon(p_staff_token text, p_session_key text, p_code text)
 returns jsonb
 language plpgsql
 security definer

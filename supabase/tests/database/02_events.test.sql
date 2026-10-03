@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(40);
+select plan(44);
 
 insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coupon_title, status, staff_token, staff_pin_hash) values
   ('00000000-0000-0000-0000-00000000e001', 'live-test', 'Live', 'Locale', now() - interval '1 hour', now() + interval '4 hours', 'Drink 5€', 'live', 'staff-live', extensions.crypt('1234', extensions.gen_salt('bf'))),
@@ -88,7 +88,7 @@ select '00000000-0000-0000-0000-00000000e005', id, 'PAST22', now(), now(), false
   from public.customers where phone_e164 = '+393331234567';
 select is(public.redeem_event_coupon('staff-past', (select v from keys where k = 'past'), 'PAST22')->>'status', 'out_of_window', 'serata finita da oltre un''ora');
 
--- 22-23: blocco dopo 5 PIN errati
+-- blocco dopo 5 PIN errati
 insert into keys values ('lock', public.verify_event_pin('staff-lock', '9999')->>'session_key');
 do $$ begin perform public.verify_event_pin('staff-lock', '0000') from generate_series(1, 5); end $$;
 select is(public.verify_event_pin('staff-lock', '9999')->>'status', 'locked', 'bloccato dopo 5 PIN errati anche con PIN giusto');
@@ -157,6 +157,25 @@ select is((select v->>'status' from res where k = 'm1'), 'created', 'registrazio
 select is((select v->>'status' from res where k = 'm2'), 'existing', 'seconda richiesta: coupon esistente');
 select is((select marketing_consent_until from public.customers where phone_e164 = '+393339990000'), null::timestamptz,
   'consenso offerte non esteso senza nuova registrazione');
+
+-- telefono non verificato: con un nome diverso dalla scheda il consenso offerte non cambia
+insert into res values ('m3', public.register_for_event(p_slug => 'lock-test', p_first_name => 'Altro', p_last_name => 'Nome',
+  p_consent_privacy => true, p_consent_coupon => true, p_consent_marketing => true, p_privacy_version => 'v1',
+  p_phone_e164 => '+393339990000'));
+select is((select v->>'status' from res where k = 'm3'), 'created', 'nuova serata con telefono noto e nome diverso: coupon creato');
+select is((select marketing_consent_until from public.customers where phone_e164 = '+393339990000'), null::timestamptz,
+  'nome diverso dalla scheda: consenso offerte non esteso');
+select is((select consent_marketing from public.registrations where coupon_token = (select v->>'coupon_token' from res where k = 'm3')),
+  false, 'nome diverso dalla scheda: la registrazione non riporta il consenso offerte');
+
+-- stesso telefono e stesso nome (maiuscole diverse) su una nuova serata: consenso esteso
+insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coupon_title, status) values
+  ('00000000-0000-0000-0000-00000000e0a7', 'name-test', 'Nome', 'Locale', now() - interval '1 hour', now() + interval '4 hours', 'Drink', 'live');
+do $$ begin perform public.register_for_event(p_slug => 'name-test', p_first_name => 'gina', p_last_name => 'NERI ',
+  p_consent_privacy => true, p_consent_coupon => true, p_consent_marketing => true, p_privacy_version => 'v1',
+  p_phone_e164 => '+393339990000'); end $$;
+select is((select marketing_consent_until from public.customers where phone_e164 = '+393339990000'), now() + interval '30 days',
+  'stesso nome della scheda: consenso offerte esteso');
 
 select * from finish();
 rollback;

@@ -11,10 +11,10 @@ insert into public.events (id, slug, title, venue_name, starts_at, ends_at, coup
 
 -- c1 e c2 sono la stessa persona (maiuscole e spazi diversi), c4 ha lo stesso nome ma un altro telefono
 insert into public.customers (id, first_name, last_name, phone_e164, marketing_consent_until, last_activity_at) values
-  ('00000000-0000-0000-0000-0000000000c1', 'Mario', 'Rossi', null, now() + interval '10 days', now()),
-  ('00000000-0000-0000-0000-0000000000c2', 'mario ', 'ROSSI', '+393330000001', now() + interval '20 days', now()),
+  ('00000000-0000-0000-0000-0000000000c1', 'Zeffirino', 'Pgtaprossi', null, now() + interval '10 days', now()),
+  ('00000000-0000-0000-0000-0000000000c2', 'zeffirino ', 'PGTAPROSSI', '+393330000001', now() + interval '20 days', now()),
   ('00000000-0000-0000-0000-0000000000c3', 'Vecchio', 'Cliente', null, null, now() - interval '13 months'),
-  ('00000000-0000-0000-0000-0000000000c4', 'Mario', 'Rossi', '+393330000002', null, now());
+  ('00000000-0000-0000-0000-0000000000c4', 'Zeffirino', 'Pgtaprossi', '+393330000002', null, now());
 
 insert into public.registrations (event_id, customer_id, coupon_code, redeemed_at, consent_privacy_at, consent_coupon_at, consent_marketing, privacy_version) values
   ('00000000-0000-0000-0000-00000000e101', '00000000-0000-0000-0000-0000000000c1', 'AAAAAA', null, now(), now(), false, 'v1'),
@@ -55,7 +55,7 @@ select is((select redeemed_count from public.customer_overview where id = '00000
 select is((select count(*)::int from public.customer_overview where id = '00000000-0000-0000-0000-0000000000c2'), 0, 'i clienti uniti sono nascosti');
 
 -- 14: dopo l'unione, il telefono porta al cliente tenuto
-select is(public.register_for_event(p_slug => 'merge-due', p_first_name => 'Mario', p_last_name => 'Rossi',
+select is(public.register_for_event(p_slug => 'merge-due', p_first_name => 'Zeffirino', p_last_name => 'Pgtaprossi',
     p_consent_privacy => true, p_consent_coupon => true, p_consent_marketing => false, p_privacy_version => 'v1',
     p_phone_e164 => '+393330000001')->>'coupon_token',
   (select coupon_token from public.registrations where coupon_code = 'CCCCCC'), 'telefono unito riconosciuto');

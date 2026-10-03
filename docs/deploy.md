@@ -11,7 +11,7 @@
 3. In Authentication:
    - Sign In / Providers → Email: il provider **deve restare attivo** (il login con password lo richiede), ma disattiva "Allow new users to sign up". In locale `supabase/config.toml` rispecchia questa scelta: `[auth] enable_signup = false`, `[auth.email] enable_signup = true`.
    - URL Configuration: imposta `Site URL = https://<dominio>`.
-   - Consigliato: attiva la MFA TOTP.
+   - Nota: la MFA TOTP non è ancora supportata dall'app (manca la schermata di verifica). Usa una password lunga e unica per l'account del PR.
 4. Project Settings → API Keys: copia la **publishable** key e la **secret** key.
 
 ## 2. Cloudflare Turnstile
@@ -60,9 +60,16 @@ Compila `DATA_CONTROLLER` in `lib/privacy.ts` e fai validare `app/privacy/page.t
 3. Controlla che il secondo tentativo risponda "Già usato".
 4. Elimina i dati di prova dal SQL editor:
    ```sql
+   -- 1) annota l'id del cliente di prova PRIMA di eliminare la serata
+   select c.id, c.first_name, c.last_name
+     from public.customers c
+     join public.registrations r on r.customer_id = c.id
+     join public.events e on e.id = r.event_id
+    where e.slug = '<slug-di-prova>';
+   -- 2) elimina la serata di prova (a cascata le sue registrazioni)
    delete from public.events where slug = '<slug-di-prova>';
-   delete from public.customers c
-    where not exists (select 1 from public.registrations r where r.customer_id = c.id);
+   -- 3) elimina SOLO il cliente di prova annotato al punto 1
+   delete from public.customers where id = '<id-del-cliente-di-prova>';
    ```
 
 ## Ripristino da backup
@@ -80,7 +87,8 @@ Si ripristina in un **nuovo** progetto Supabase pulito. `schema.sql` e `roles.sq
 5. Aggiorna le variabili d'ambiente su Netlify (URL e chiavi del nuovo progetto) e i secret GitHub (`SUPABASE_DB_URL`), poi rifai lo smoke test.
 
 ## Limiti noti e rischi accettati
-- Il telefono non è verificato: chi conosce il numero di una persona già registrata alla stessa serata può riaprire il suo coupon (mitigazione futura: OTP).
+- Il telefono non è verificato. Chi conosce il numero di un cliente già registrato può: riaprire il suo coupon per la stessa serata; registrarlo a un'altra serata attiva (il coupon finisce sulla sua scheda). Il nome del cliente si vede solo sul telefono che ha fatto la registrazione, e il consenso alle offerte si rinnova solo se anche nome e cognome coincidono con la scheda. Mitigazione futura: verifica via OTP.
+- Una serata si può eliminare dall'admin solo se non ha registrazioni; altrimenti va chiusa.
 - Il rate limit per IP si basa sull'header `x-nf-client-connection-ip` impostato da Netlify: se si cambia hosting va rivisto `lib/ip.ts`.
 - La sessione dei baristi vale finché il PR non cambia il PIN della serata (per revocare tutti i telefoni: cambiare il PIN).
 - L'informativa privacy è una bozza da validare.

@@ -1,3 +1,4 @@
+import { ConfirmButton } from '@/components/confirm-button';
 import { requireAdmin } from '@/lib/auth';
 import { formatRome } from '@/lib/dates';
 import { mergeCustomers } from '../actions';
@@ -10,7 +11,9 @@ function KeepCard({ keep, drop }: { keep: Side; drop: Side }) {
       <p className="font-bold">{keep.firstName} {keep.lastName}</p>
       <p className="text-sm text-muted">{keep.phone ?? 'Senza telefono'} · dal {formatRome(keep.createdAt, 'dd/MM/yyyy')}</p>
       <form action={mergeCustomers.bind(null, keep.id, drop.id)}>
-        <button className="btn btn-secondary">Tieni questo</button>
+        <ConfirmButton className="btn btn-secondary" message={`Unire le due schede tenendo ${keep.firstName} ${keep.lastName}? L'operazione non si può annullare.`}>
+          Tieni questo
+        </ConfirmButton>
       </form>
     </div>
   );

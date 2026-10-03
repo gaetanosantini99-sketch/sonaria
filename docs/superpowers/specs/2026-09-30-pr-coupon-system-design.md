@@ -100,7 +100,8 @@ pin_attempts      scope, key, failed_count, locked_until
   - se esiste già una registrazione per quella serata (stesso cliente oppure stesso `device_id`), restituisce il coupon esistente;
   - altrimenti crea la registrazione e il codice;
   - se c'è il consenso alle offerte, imposta `marketing_consent_until = now() + 30 giorni`.
-- `redeem_event_coupon(staff_token, pin, code)`: controlla PIN e blocco, poi fa `UPDATE … SET redeemed_at = now() WHERE redeemed_at IS NULL AND now() BETWEEN starts_at AND ends_at + margine`. Restituisce `ok | already_used | not_found | out_of_window | locked`.
+- `verify_event_pin(staff_token, pin)`: controlla PIN e blocco (5 tentativi, 15 minuti) e restituisce una `session_key` derivata dal server (sha256 dell'hash del PIN). Il cookie del barista contiene token e chiave, mai il PIN. Cambiare il PIN invalida tutte le sessioni.
+- `redeem_event_coupon(staff_token, session_key, code)`: confronta la chiave di sessione (senza contare tentativi), poi fa `UPDATE … SET redeemed_at = now() WHERE redeemed_at IS NULL AND now() BETWEEN starts_at AND ends_at + margine`. Restituisce `ok | already_used | not_found | out_of_window | session_expired | unauthorized`.
 - `redeem_offer_code(validation_token, pin, code)`: stessa logica, più il controllo di validità e di `max_redemptions`.
 - `generate_offer_codes(offer_id, event_ids[]?, only_redeemed bool)`: considera solo i clienti con `marketing_consent_until > now()` e non uniti ad altri, poi inserisce i codici con `ON CONFLICT DO NOTHING`.
 - `merge_customers(keep_id, drop_id)`: sposta registrazioni e codici sul cliente principale (se c'è un conflitto sulla stessa serata tiene quella già bruciata) e imposta `merged_into_id`.
@@ -157,3 +158,17 @@ supabase/migrations/*.sql   supabase/tests/*.sql (pgTAP)
   - `merge_customers` non perde dati.
 - **Playwright end-to-end (su Supabase dev):** crea la serata in admin, apre `/e/slug`, compila il form, arriva al coupon, `/v` con PIN lo brucia, un secondo tentativo risponde "già usato". In F2 si aggiunge: offerta, invio, `/o`, validazione su `/s`, report aggiornato.
 - **Controlli di sicurezza:** `get_advisors` di Supabase (sicurezza e prestazioni) prima di ogni rilascio. Verifica che la anon key non possa leggere nessuna tabella.
+
+## Aggiornamenti dopo l'implementazione della Fase 1 (2026-10-03)
+
+Decisioni prese durante l'esecuzione, che prevalgono sul testo sopra dove differiscono:
+
+- **Sessione dei baristi:** chiave di sessione derivata dal server al posto del PIN nel cookie (vedi funzioni sopra). La validazione degli sponsor in Fase 2 deve usare lo stesso schema.
+- **Concorrenza:** lock advisory sui tentativi di PIN e sui doppi tap dallo stesso dispositivo; indice unico parziale `registrations(event_id, device_id)`.
+- **Consenso alle offerte:** cambia solo quando nasce una nuova registrazione (che ne è la prova) e, se il cliente è riconosciuto dal telefono, solo se nome e cognome coincidono con la scheda.
+- **Telefono non verificato:** rischio accettato e documentato in `docs/deploy.md`. Il nome del cliente compare sul coupon solo sul dispositivo che ha fatto la registrazione.
+- **Serate:** eliminabili solo senza registrazioni.
+- **Ricerca clienti:** ignora maiuscole e accenti (estensione `unaccent`, colonna `search_text` nella vista `customer_overview`).
+- **Env:** `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `SUPABASE_SECRET_KEY` sostituiscono `ANON_KEY` / `SERVICE_ROLE_KEY`.
+- **Auth:** provider Email attivo con registrazioni pubbliche disattivate; il login rifiuta gli account non presenti in `admins`. La 2FA TOTP non è implementata.
+- **Tooling:** `vitest.config.mts`; `proxy.ts` (Next 16) al posto di `middleware.ts`.

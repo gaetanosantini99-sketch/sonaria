@@ -56,6 +56,21 @@ export async function updateEvent(eventId: string, _prev: EventFormState, formDa
   return { errors: {}, values: formValues(formData), saved: true };
 }
 
+export async function deleteEvent(eventId: string): Promise<void> {
+  const supabase = await requireAdmin();
+  const { count, error: countError } = await supabase
+    .from('registrations')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', eventId);
+  if (countError) throw new Error('Eliminazione non riuscita');
+  // con registrazioni presenti si perderebbero coupon e prove di consenso
+  if ((count ?? 0) > 0) throw new Error('La serata ha registrazioni e non può essere eliminata');
+  const { error } = await supabase.from('events').delete().eq('id', eventId);
+  if (error) throw new Error('Eliminazione non riuscita');
+  revalidatePath('/admin/eventi');
+  redirect('/admin/eventi');
+}
+
 export async function setEventStatus(eventId: string, status: string): Promise<void> {
   const supabase = await requireAdmin();
   if (!isEventStatus(status)) throw new Error('Stato non valido');

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { formatRome } from '@/lib/dates';
+import { readDeviceId } from '@/lib/device';
 import { couponStatus } from '@/lib/event-window';
 import { qrSvg } from '@/lib/qr';
 import { siteUrl } from '@/lib/site';
@@ -12,7 +13,7 @@ export default async function CouponPage({ params }: { params: Promise<{ token: 
   const { token } = await params;
   const { data: reg, error } = await createAdminClient()
     .from('registrations')
-    .select('coupon_code, redeemed_at, customers(first_name), events(title, venue_name, starts_at, ends_at, coupon_title, coupon_description)')
+    .select('coupon_code, redeemed_at, device_id, customers(first_name), events(title, venue_name, starts_at, ends_at, coupon_title, coupon_description)')
     .eq('coupon_token', token)
     .maybeSingle();
   if (error) {
@@ -22,6 +23,9 @@ export default async function CouponPage({ params }: { params: Promise<{ token: 
   if (!reg?.events) notFound();
 
   const event = reg.events;
+  // il telefono non è verificato: il nome si mostra solo al dispositivo che ha fatto la registrazione
+  const deviceId = await readDeviceId();
+  const firstName = deviceId && deviceId === reg.device_id ? reg.customers?.first_name : null;
   const status = couponStatus(reg.redeemed_at, event.ends_at, new Date());
   const qr = status === 'valid' ? await qrSvg(siteUrl(`/v/scan?code=${reg.coupon_code}`)) : null;
   const label =
@@ -33,7 +37,7 @@ export default async function CouponPage({ params }: { params: Promise<{ token: 
 
   return (
     <main className="mx-auto max-w-md space-y-6 px-4 py-8 text-center">
-      <p className="text-muted">Ciao {reg.customers?.first_name}, ecco il tuo coupon per</p>
+      <p className="text-muted">{firstName ? `Ciao ${firstName}, ecco` : 'Ecco'} il tuo coupon per</p>
       <h1 className="text-2xl font-black">{event.title}</h1>
       <p className="text-muted">{event.venue_name} · {formatRome(event.starts_at)}</p>
       <section className="card space-y-4">

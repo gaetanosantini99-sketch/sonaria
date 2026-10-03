@@ -17,6 +17,7 @@ test('il PR trova, unisce ed esporta i clienti', async ({ browser }) => {
   await admin.goto('/admin/clienti/doppioni');
   const pair = admin.getByTestId('duplicate-pair').filter({ hasText: lastName });
   await expect(pair).toHaveCount(1);
+  admin.once('dialog', (dialog) => dialog.accept());
   await pair.getByRole('button', { name: 'Tieni questo' }).first().click();
   await expect(admin.getByTestId('duplicate-pair').filter({ hasText: lastName })).toHaveCount(0);
 
