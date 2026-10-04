@@ -12,6 +12,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-30-pr-coupon-system-design.md`
 
+> **Nota (2026-10-03):** il piano è stato eseguito. Il codice dei task qui sotto è quello pianificato in origine: le revisioni lo hanno modificato in più punti (sessione dei baristi con chiave al posto del PIN, lock di concorrenza, regole sul consenso, ricerca senza accenti, eliminazione serate). Fa fede il codice nel repository; le deviazioni sono riassunte in fondo alla spec.
+
 ## Global Constraints
 
 - **Ambiente:** Node 24. I comandi si lanciano da Git Bash nella root `C:\G\Pr_SBS`. Supabase in locale con la CLI più Docker (`npx supabase ...`, CLI come devDependency).
