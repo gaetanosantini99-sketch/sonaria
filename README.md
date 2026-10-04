@@ -1,4 +1,4 @@
-# Sistema promozionale PR/DJ
+# Sonaria
 
 Spec: `docs/superpowers/specs/2026-09-30-pr-coupon-system-design.md`
 
