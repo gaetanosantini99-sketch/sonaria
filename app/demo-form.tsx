@@ -14,7 +14,7 @@ export function DemoForm() {
       <section className="card space-y-3 text-center" aria-live="polite">
         <p className="text-sm uppercase tracking-widest text-muted">Sei dentro</p>
         <h2 className="text-2xl font-black">Grazie {state.done.firstName}!</h2>
-        <p className="rounded-xl border border-accent px-4 py-5 text-xl font-black text-accent">Buono sconto serata attivo</p>
+        <p className="rounded-xl border border-accent px-4 py-5 text-xl font-black text-accent">Invito prenotato</p>
         <p className="text-sm text-muted">Mostralo al bancone durante la serata.</p>
       </section>
     );
@@ -43,7 +43,7 @@ export function DemoForm() {
         <FieldError message={state.errors.consent_privacy} />
         <label className="flex items-start gap-3">
           <input type="checkbox" name="consent_coupon" defaultChecked={v.consent_coupon === 'on'} className="mt-0.5 size-5 shrink-0 accent-accent" />
-          <span>Voglio il buono sconto della serata</span>
+          <span>Voglio il mio invito alla serata</span>
         </label>
         <FieldError message={state.errors.consent_coupon} />
         <label className="flex items-start gap-3">
@@ -52,7 +52,7 @@ export function DemoForm() {
         </label>
       </div>
 
-      <button className="btn btn-primary w-full" disabled={pending}>{pending ? 'Attendi…' : 'Ottieni il buono'}</button>
+      <button className="btn btn-primary w-full" disabled={pending}>{pending ? 'Attendi…' : 'Ottieni il tuo invito'}</button>
     </form>
   );
 }

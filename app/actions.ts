@@ -1,6 +1,6 @@
 'use server';
 
-// DEMO: nessun salvataggio. Il database arriva dopo; qui si valida soltanto e si mostra il buono.
+// DEMO: nessun salvataggio. Il database arriva dopo; qui si valida soltanto e si mostra l'invito.
 export type DemoState = {
   errors: Record<string, string>;
   values?: Record<string, string>;
@@ -19,7 +19,7 @@ export async function submitDemo(_prev: DemoState, formData: FormData): Promise<
   if (!lastName) errors.last_name = 'Inserisci il cognome';
   else if (lastName.length > 60) errors.last_name = 'Cognome troppo lungo';
   if (values.consent_privacy !== 'on') errors.consent_privacy = "Devi accettare l'informativa privacy";
-  if (values.consent_coupon !== 'on') errors.consent_coupon = 'Devi accettare il buono sconto della serata';
+  if (values.consent_coupon !== 'on') errors.consent_coupon = 'Devi richiedere il tuo invito alla serata';
   if (Object.keys(errors).length > 0) return { errors, values };
   return { errors: {}, done: { firstName } };
 }
