@@ -1,4 +1,6 @@
 import type { CSSProperties } from 'react';
+import Image from 'next/image';
+import locandina from '@/public/locandina-sonaria.jpg';
 import { DemoForm } from './demo-form';
 
 export const metadata = { title: 'Sonaria · 01.11.26' };
@@ -6,11 +8,15 @@ export const metadata = { title: 'Sonaria · 01.11.26' };
 export default function HomePage() {
   return (
     <main className="mx-auto max-w-md space-y-6 px-4 py-8" style={{ '--color-accent': '#2bff5a' } as CSSProperties}>
-      <header className="space-y-2 text-center">
-        <h1 className="text-5xl font-black uppercase tracking-wider text-accent">Sonaria</h1>
-        <p className="text-sm font-bold uppercase tracking-widest">Degustazione sonora</p>
-        <p className="text-muted">Garage del Vino · Piazza Giuseppe Garibaldi 2, Spoleto (PG) · 01.11.26</p>
-      </header>
+      <h1 className="sr-only">Sonaria · Degustazione sonora</h1>
+      <Image
+        src={locandina}
+        alt="Sonaria, degustazione sonora. Il Garage del Vino, Piazza Giuseppe Garibaldi 2, Spoleto (PG). Dal 01 al 29.11.26, ore 19:30."
+        preload
+        placeholder="blur"
+        sizes="(max-width: 448px) 100vw, 448px"
+        className="h-auto w-full rounded-2xl"
+      />
       <DemoForm />
       <p className="text-center text-xs text-muted">Versione di prova: i dati inseriti non vengono salvati.</p>
     </main>
