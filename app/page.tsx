@@ -14,8 +14,8 @@ export default function HomePage() {
         alt="Sonaria, degustazione sonora. Il Garage del Vino, Piazza Giuseppe Garibaldi 2, Spoleto (PG). Dal 01 al 29.11.26, ore 19:30."
         preload
         placeholder="blur"
-        sizes="(max-width: 448px) 100vw, 448px"
-        className="h-auto w-full rounded-2xl"
+        sizes="300px"
+        className="mx-auto h-auto max-h-[45svh] w-auto rounded-2xl"
       />
       <DemoForm />
       <p className="text-center text-xs text-muted">Versione di prova: i dati inseriti non vengono salvati.</p>
